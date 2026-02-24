@@ -1,0 +1,45 @@
+services:
+  - type: web
+    name: lawminded-api
+    env: docker
+    repo: https://github.com/Bharath2805/lawminded-platform
+    dockerfilePath: ./apps/api/Dockerfile
+    dockerContext: ./
+    healthCheckPath: /ready
+    envVars:
+      - key: NODE_ENV
+        value: production
+      - key: PORT
+        value: 10000
+      - key: CORS_ORIGIN
+        value: https://your-web-domain
+      - key: WEB_APP_URL
+        value: https://your-web-domain
+      - key: OPENAI_API_KEY
+        sync: false
+      - key: TAVILY_API_KEY
+        sync: false
+      - key: VECTOR_STORE_ID
+        sync: false
+      - key: DATABASE_URL
+        sync: false
+      - key: REDIS_URL
+        sync: false
+      - key: RESEND_API_KEY
+        sync: false
+      - key: SESSION_SECRET
+        sync: false
+      - key: CSRF_SECRET
+        sync: false
+      - key: ADMIN_EMAIL
+        sync: false
+      - key: SESSION_COOKIE_NAME
+        value: lm_session
+      - key: SESSION_TTL_HOURS
+        value: 336
+      - key: COOKIE_DOMAIN
+        sync: false
+      - key: STRIPE_SECRET_KEY
+        sync: false
+      - key: STRIPE_WEBHOOK_SECRET
+        sync: false

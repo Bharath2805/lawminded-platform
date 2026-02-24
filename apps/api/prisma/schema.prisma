@@ -1,0 +1,497 @@
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+  directUrl = env("DIRECT_URL")
+}
+
+enum UserStatus {
+  ACTIVE
+  INVITED
+  SUSPENDED
+  DELETED
+}
+
+enum LeadStatus {
+  NEW
+  CONTACTED
+  QUALIFIED
+  CLOSED
+}
+
+enum NewsletterStatus {
+  PENDING
+  SUBSCRIBED
+  UNSUBSCRIBED
+}
+
+enum BillingInterval {
+  MONTH
+  YEAR
+  ONE_TIME
+}
+
+enum SubscriptionStatus {
+  INCOMPLETE
+  INCOMPLETE_EXPIRED
+  TRIALING
+  ACTIVE
+  PAST_DUE
+  CANCELED
+  UNPAID
+  PAUSED
+}
+
+enum PaymentStatus {
+  PENDING
+  SUCCEEDED
+  FAILED
+  CANCELED
+  REFUNDED
+  REQUIRES_ACTION
+}
+
+enum DsarRequestType {
+  ACCESS
+  EXPORT
+  RECTIFICATION
+  ERASURE
+  RESTRICTION
+  OBJECTION
+}
+
+enum DsarRequestStatus {
+  OPEN
+  IN_PROGRESS
+  COMPLETED
+  REJECTED
+}
+
+enum ChatMessageRole {
+  USER
+  ASSISTANT
+  SYSTEM
+  ERROR
+}
+
+enum ResourceVisibility {
+  PUBLIC
+  AUTHENTICATED
+}
+
+enum ResourceAccessAction {
+  VIEW
+  DOWNLOAD
+}
+
+enum ResourceDeliveryType {
+  LINK
+  FILE
+}
+
+enum ResourceEntitlementMode {
+  ALL_AUTHENTICATED
+  PLAN_RESTRICTED
+}
+
+model User {
+  id                   String          @id @default(uuid()) @db.Uuid
+  email                String          @unique
+  passwordHash         String          @map("password_hash")
+  emailVerifiedAt      DateTime?       @map("email_verified_at")
+  stripeCustomerId     String?         @unique @map("stripe_customer_id")
+  status               UserStatus      @default(ACTIVE)
+  createdAt            DateTime        @default(now()) @map("created_at")
+  updatedAt            DateTime        @updatedAt @map("updated_at")
+  roles                UserRole[]
+  sessions             Session[]
+  subscriptions        Subscription[]
+  payments             Payment[]
+  consentLogs          ConsentLog[]
+  cookiePreferences    CookiePreference[]
+  dsarRequests         DsarRequest[]   @relation("DsarRequestUser")
+  dsarResolvedRequests DsarRequest[]   @relation("DsarResolvedBy")
+  adminAuditLogs       AdminAuditLog[] @relation("AdminAuditActor")
+  resourceAccessLogs   ResourceAccessLog[]
+  uploadedResourceAssets ResourceAsset[] @relation("ResourceAssetUploader")
+  chatConversations    ChatConversation[]
+
+  @@index([status])
+  @@map("users")
+}
+
+model Role {
+  id          String     @id @default(uuid()) @db.Uuid
+  name        String     @unique
+  description String?
+  createdAt   DateTime   @default(now()) @map("created_at")
+  updatedAt   DateTime   @updatedAt @map("updated_at")
+  users       UserRole[]
+
+  @@map("roles")
+}
+
+model UserRole {
+  userId     String   @map("user_id") @db.Uuid
+  roleId     String   @map("role_id") @db.Uuid
+  assignedAt DateTime @default(now()) @map("assigned_at")
+
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+  role Role @relation(fields: [roleId], references: [id], onDelete: Cascade)
+
+  @@id([userId, roleId])
+  @@index([roleId])
+  @@map("user_roles")
+}
+
+model Session {
+  id          String    @id @default(uuid()) @db.Uuid
+  userId      String    @map("user_id") @db.Uuid
+  sessionHash String    @unique @map("session_hash")
+  ipHash      String?   @map("ip_hash")
+  userAgent   String?   @map("user_agent")
+  createdAt   DateTime  @default(now()) @map("created_at")
+  expiresAt   DateTime  @map("expires_at")
+  revokedAt   DateTime? @map("revoked_at")
+
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@index([userId, expiresAt])
+  @@index([expiresAt])
+  @@map("sessions")
+}
+
+model DemoRequest {
+  id          String     @id @default(uuid()) @db.Uuid
+  fullName    String     @map("full_name")
+  workEmail   String     @map("work_email")
+  company     String
+  jobTitle    String?    @map("job_title")
+  teamSize    String?    @map("team_size")
+  useCase     String?    @map("use_case")
+  message     String?
+  status      LeadStatus @default(NEW)
+  source      String?    @default("website")
+  createdAt   DateTime   @default(now()) @map("created_at")
+  updatedAt   DateTime   @updatedAt @map("updated_at")
+
+  @@index([workEmail])
+  @@index([status, createdAt])
+  @@map("demo_requests")
+}
+
+model ContactMessage {
+  id          String   @id @default(uuid()) @db.Uuid
+  fullName    String   @map("full_name")
+  email       String
+  company     String?
+  topic       String?
+  message     String
+  source      String?  @default("website")
+  createdAt   DateTime @default(now()) @map("created_at")
+
+  @@index([email])
+  @@index([createdAt])
+  @@map("contact_messages")
+}
+
+model NewsletterSubscriber {
+  id                String           @id @default(uuid()) @db.Uuid
+  email             String           @unique
+  fullName          String?          @map("full_name")
+  status            NewsletterStatus @default(PENDING)
+  subscribedAt      DateTime?        @map("subscribed_at")
+  unsubscribedAt    DateTime?        @map("unsubscribed_at")
+  source            String?          @default("website")
+  createdAt         DateTime         @default(now()) @map("created_at")
+  updatedAt         DateTime         @updatedAt @map("updated_at")
+
+  @@index([status, createdAt])
+  @@map("newsletter_subscribers")
+}
+
+model Plan {
+  id              String          @id @default(uuid()) @db.Uuid
+  key             String          @unique
+  name            String
+  description     String?
+  amountCents     Int             @map("amount_cents")
+  currency        String          @default("eur")
+  interval        BillingInterval
+  active          Boolean         @default(true)
+  chatbotEnabled  Boolean         @default(false) @map("chatbot_enabled")
+  stripeProductId String?         @unique @map("stripe_product_id")
+  stripePriceId   String?         @unique @map("stripe_price_id")
+  createdAt       DateTime        @default(now()) @map("created_at")
+  updatedAt       DateTime        @updatedAt @map("updated_at")
+  subscriptions   Subscription[]
+  payments        Payment[]
+  resourceEntitlements PlanResourceEntitlement[]
+
+  @@index([active, interval])
+  @@map("plans")
+}
+
+model Subscription {
+  id                   String             @id @default(uuid()) @db.Uuid
+  userId               String             @map("user_id") @db.Uuid
+  planId               String?            @map("plan_id") @db.Uuid
+  stripeCustomerId     String             @map("stripe_customer_id")
+  stripeSubscriptionId String?            @unique @map("stripe_subscription_id")
+  status               SubscriptionStatus @default(INCOMPLETE)
+  cancelAtPeriodEnd    Boolean            @default(false) @map("cancel_at_period_end")
+  currentPeriodStart   DateTime?          @map("current_period_start")
+  currentPeriodEnd     DateTime?          @map("current_period_end")
+  trialEnd             DateTime?          @map("trial_end")
+  canceledAt           DateTime?          @map("canceled_at")
+  createdAt            DateTime           @default(now()) @map("created_at")
+  updatedAt            DateTime           @updatedAt @map("updated_at")
+
+  user     User      @relation(fields: [userId], references: [id], onDelete: Cascade)
+  plan     Plan?     @relation(fields: [planId], references: [id], onDelete: SetNull)
+  payments Payment[]
+
+  @@index([userId])
+  @@index([status, currentPeriodEnd])
+  @@index([stripeCustomerId])
+  @@map("subscriptions")
+}
+
+model Payment {
+  id                    String        @id @default(uuid()) @db.Uuid
+  userId                String        @map("user_id") @db.Uuid
+  planId                String?       @map("plan_id") @db.Uuid
+  subscriptionId        String?       @map("subscription_id") @db.Uuid
+  stripePaymentIntentId String?       @unique @map("stripe_payment_intent_id")
+  stripeInvoiceId       String?       @unique @map("stripe_invoice_id")
+  stripeCheckoutSessionId String?     @unique @map("stripe_checkout_session_id")
+  amountCents           Int           @map("amount_cents")
+  currency              String        @default("eur")
+  status                PaymentStatus @default(PENDING)
+  paidAt                DateTime?     @map("paid_at")
+  failedAt              DateTime?     @map("failed_at")
+  createdAt             DateTime      @default(now()) @map("created_at")
+  updatedAt             DateTime      @updatedAt @map("updated_at")
+
+  user         User          @relation(fields: [userId], references: [id], onDelete: Cascade)
+  plan         Plan?         @relation(fields: [planId], references: [id], onDelete: SetNull)
+  subscription Subscription? @relation(fields: [subscriptionId], references: [id], onDelete: SetNull)
+
+  @@index([userId, createdAt])
+  @@index([status, createdAt])
+  @@map("payments")
+}
+
+model BillingWebhookEvent {
+  id            String   @id @default(uuid()) @db.Uuid
+  stripeEventId String   @unique @map("stripe_event_id")
+  type          String
+  payload       Json
+  processedAt   DateTime @default(now()) @map("processed_at")
+
+  @@index([type, processedAt])
+  @@map("billing_webhook_events")
+}
+
+model CookiePreference {
+  id            String   @id @default(uuid()) @db.Uuid
+  userId        String?  @unique @map("user_id") @db.Uuid
+  anonymousId   String?  @unique @map("anonymous_id")
+  necessary     Boolean  @default(true)
+  analytics     Boolean  @default(false)
+  marketing     Boolean  @default(false)
+  policyVersion String   @map("policy_version")
+  source        String?  @default("website")
+  ipHash        String?  @map("ip_hash")
+  userAgent     String?  @map("user_agent")
+  createdAt     DateTime @default(now()) @map("created_at")
+  updatedAt     DateTime @updatedAt @map("updated_at")
+
+  user        User?       @relation(fields: [userId], references: [id], onDelete: SetNull)
+  consentLogs ConsentLog[]
+
+  @@index([createdAt])
+  @@map("cookie_preferences")
+}
+
+model ConsentLog {
+  id             String   @id @default(uuid()) @db.Uuid
+  preferenceId   String?  @map("preference_id") @db.Uuid
+  userId         String?  @map("user_id") @db.Uuid
+  anonymousId    String?  @map("anonymous_id")
+  necessary      Boolean  @default(true)
+  analytics      Boolean  @default(false)
+  marketing      Boolean  @default(false)
+  policyVersion  String   @map("policy_version")
+  source         String?  @default("website")
+  ipHash         String?  @map("ip_hash")
+  userAgent      String?  @map("user_agent")
+  consentedAt    DateTime @default(now()) @map("consented_at")
+
+  user       User?             @relation(fields: [userId], references: [id], onDelete: SetNull)
+  preference CookiePreference? @relation(fields: [preferenceId], references: [id], onDelete: SetNull)
+
+  @@index([userId, consentedAt])
+  @@index([anonymousId, consentedAt])
+  @@index([consentedAt])
+  @@map("consent_logs")
+}
+
+model DsarRequest {
+  id              String            @id @default(uuid()) @db.Uuid
+  userId          String?           @map("user_id") @db.Uuid
+  requesterEmail  String            @map("requester_email")
+  type            DsarRequestType
+  status          DsarRequestStatus @default(OPEN)
+  details         String?
+  source          String?           @default("self-service")
+  requestedAt     DateTime          @default(now()) @map("requested_at")
+  resolvedAt      DateTime?         @map("resolved_at")
+  resolutionNote  String?           @map("resolution_note")
+  resolvedByUserId String?          @map("resolved_by_user_id") @db.Uuid
+  createdAt       DateTime          @default(now()) @map("created_at")
+  updatedAt       DateTime          @updatedAt @map("updated_at")
+
+  user       User? @relation("DsarRequestUser", fields: [userId], references: [id], onDelete: SetNull)
+  resolvedBy User? @relation("DsarResolvedBy", fields: [resolvedByUserId], references: [id], onDelete: SetNull)
+
+  @@index([status, requestedAt])
+  @@index([requesterEmail, requestedAt])
+  @@index([userId, requestedAt])
+  @@map("dsar_requests")
+}
+
+model AdminAuditLog {
+  id          String   @id @default(uuid()) @db.Uuid
+  adminUserId String   @map("admin_user_id") @db.Uuid
+  action      String
+  targetType  String?  @map("target_type")
+  targetId    String?  @map("target_id")
+  details     Json?
+  createdAt   DateTime @default(now()) @map("created_at")
+
+  adminUser User @relation("AdminAuditActor", fields: [adminUserId], references: [id], onDelete: Cascade)
+
+  @@index([adminUserId, createdAt])
+  @@index([action, createdAt])
+  @@map("admin_audit_logs")
+}
+
+model ChatConversation {
+  id            String        @id @default(uuid()) @db.Uuid
+  userId        String?       @map("user_id") @db.Uuid
+  anonymousId   String?       @map("anonymous_id")
+  isTrial       Boolean       @default(false) @map("is_trial")
+  title         String        @default("New conversation")
+  threadId      String?       @unique @map("thread_id")
+  pinnedAt      DateTime?     @map("pinned_at")
+  archivedAt    DateTime?     @map("archived_at")
+  createdAt     DateTime      @default(now()) @map("created_at")
+  updatedAt     DateTime      @updatedAt @map("updated_at")
+  lastMessageAt DateTime      @default(now()) @map("last_message_at")
+  deletedAt     DateTime?     @map("deleted_at")
+
+  user     User?         @relation(fields: [userId], references: [id], onDelete: SetNull)
+  messages ChatMessage[]
+
+  @@index([userId, lastMessageAt])
+  @@index([userId, createdAt])
+  @@index([userId, archivedAt, lastMessageAt])
+  @@index([userId, pinnedAt, lastMessageAt])
+  @@index([anonymousId, isTrial, lastMessageAt])
+  @@index([isTrial, deletedAt])
+  @@index([deletedAt])
+  @@map("chat_conversations")
+}
+
+model ChatMessage {
+  id             String          @id @default(uuid()) @db.Uuid
+  conversationId String          @map("conversation_id") @db.Uuid
+  role           ChatMessageRole
+  content        String
+  createdAt      DateTime        @default(now()) @map("created_at")
+
+  conversation ChatConversation @relation(fields: [conversationId], references: [id], onDelete: Cascade)
+
+  @@index([conversationId, createdAt])
+  @@map("chat_messages")
+}
+
+model Resource {
+  id          String             @id @default(uuid()) @db.Uuid
+  key         String             @unique
+  title       String
+  summary     String
+  category    String?
+  href        String
+  deliveryType ResourceDeliveryType @default(LINK) @map("delivery_type")
+  visibility  ResourceVisibility @default(AUTHENTICATED)
+  entitlementMode ResourceEntitlementMode @default(ALL_AUTHENTICATED) @map("entitlement_mode")
+  active      Boolean            @default(true)
+  sortOrder   Int                @default(0) @map("sort_order")
+  createdAt   DateTime           @default(now()) @map("created_at")
+  updatedAt   DateTime           @updatedAt @map("updated_at")
+  accessLogs  ResourceAccessLog[]
+  asset       ResourceAsset?
+  planEntitlements PlanResourceEntitlement[]
+
+  @@index([active, visibility, entitlementMode, sortOrder])
+  @@map("resources")
+}
+
+model ResourceAccessLog {
+  id          String               @id @default(uuid()) @db.Uuid
+  resourceId  String               @map("resource_id") @db.Uuid
+  userId      String?              @map("user_id") @db.Uuid
+  anonymousId String?              @map("anonymous_id")
+  action      ResourceAccessAction @default(VIEW)
+  source      String?              @default("web")
+  ipHash      String?              @map("ip_hash")
+  userAgent   String?              @map("user_agent")
+  createdAt   DateTime             @default(now()) @map("created_at")
+
+  resource Resource @relation(fields: [resourceId], references: [id], onDelete: Cascade)
+  user     User?    @relation(fields: [userId], references: [id], onDelete: SetNull)
+
+  @@index([resourceId, createdAt])
+  @@index([userId, createdAt])
+  @@index([action, createdAt])
+  @@map("resource_access_logs")
+}
+
+model ResourceAsset {
+  id               String   @id @default(uuid()) @db.Uuid
+  resourceId       String   @unique @map("resource_id") @db.Uuid
+  storageKey       String   @unique @map("storage_key")
+  bucket           String
+  fileName         String   @map("file_name")
+  mimeType         String   @map("mime_type")
+  sizeBytes        Int      @map("size_bytes")
+  checksumSha256   String?  @map("checksum_sha256")
+  uploadedByUserId String?  @map("uploaded_by_user_id") @db.Uuid
+  createdAt        DateTime @default(now()) @map("created_at")
+  updatedAt        DateTime @updatedAt @map("updated_at")
+
+  resource       Resource @relation(fields: [resourceId], references: [id], onDelete: Cascade)
+  uploadedByUser User?    @relation("ResourceAssetUploader", fields: [uploadedByUserId], references: [id], onDelete: SetNull)
+
+  @@index([uploadedByUserId, createdAt])
+  @@index([createdAt])
+  @@map("resource_assets")
+}
+
+model PlanResourceEntitlement {
+  planId     String   @map("plan_id") @db.Uuid
+  resourceId String   @map("resource_id") @db.Uuid
+  createdAt  DateTime @default(now()) @map("created_at")
+
+  plan     Plan     @relation(fields: [planId], references: [id], onDelete: Cascade)
+  resource Resource @relation(fields: [resourceId], references: [id], onDelete: Cascade)
+
+  @@id([planId, resourceId])
+  @@index([resourceId, createdAt])
+  @@map("plan_resource_entitlements")
+}

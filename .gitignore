@@ -5,22 +5,13 @@
 .env.test.local
 .env.production.local
 
-# Python
-__pycache__/
-*.py[cod]
-*$py.class
-*.so
-.Python
-env/
-venv/
-ENV/
-.venv
-
 # Node
 node_modules/
+.pnpm-store/
 npm-debug.log*
 yarn-debug.log*
 yarn-error.log*
+pnpm-debug.log*
 
 # IDE
 .vscode/
@@ -28,6 +19,7 @@ yarn-error.log*
 *.swp
 *.swo
 *~
+.husky/_/
 
 # OS
 .DS_Store
@@ -36,5 +28,6 @@ Thumbs.db
 # Build outputs
 dist/
 build/
-*.egg-info/
-
+.next/
+coverage/
+.turbo/
