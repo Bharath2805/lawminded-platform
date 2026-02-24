@@ -97,3 +97,49 @@ Send only:
 - Short scope note (review-only, not production)
 
 Do not share secrets or provider keys.
+
+## 5. Alternative: Deploy API on Vercel (Review Only)
+
+Use this when you want both frontend and backend on Vercel for a temporary review link.
+
+API project settings:
+
+- New Vercel project from the same repo
+- Root Directory: `apps/api`
+- Build uses `/Users/bharathkumarreddygorla/Desktop/bot/apps/api/vercel.json`
+
+API environment variables (Vercel API project):
+
+- `NODE_ENV=production`
+- `CORS_ORIGIN=https://<your-web-vercel-domain>`
+- `WEB_APP_URL=https://<your-web-vercel-domain>`
+- `DATABASE_URL=<neon pooler>`
+- `DIRECT_URL=<neon direct>`
+- `REDIS_URL=<upstash redis>`
+- `OPENAI_API_KEY=<openai>`
+- `TAVILY_API_KEY=<optional>`
+- `VECTOR_STORE_ID=<if used>`
+- `RESEND_API_KEY=<resend>`
+- `SESSION_SECRET=<strong random string>`
+- `CSRF_SECRET=<strong random string>`
+- `ADMIN_EMAIL=<admin email>`
+- `SESSION_COOKIE_NAME=lm_session`
+- `SESSION_TTL_HOURS=336`
+- `COOKIE_DOMAIN=` (empty for review)
+- `STRIPE_SECRET_KEY=<stripe test secret>`
+- `STRIPE_WEBHOOK_SECRET=<optional for review>`
+- `PREMIUM_PLAN_KEYS=growth_monthly,growth_yearly`
+- `PRIVACY_POLICY_VERSION=2026-02-17`
+
+Web project environment variables (Vercel web project):
+
+- `NEXT_PUBLIC_APP_URL=https://<your-web-vercel-domain>`
+- `NEXT_PUBLIC_API_URL=https://<your-api-vercel-domain>`
+- `API_URL=https://<your-api-vercel-domain>`
+- `NEXT_PUBLIC_STRIPE_PUBLISHABLE_KEY=<stripe test publishable key>`
+- `NEXT_PUBLIC_COOKIE_POLICY_VERSION=2026-02-17`
+
+Notes:
+
+- API endpoints remain the same (`/health`, `/ready`, `/api/*`).
+- Stripe webhook handling is better on a persistent backend (Render) for production; use Vercel API as review/staging convenience.
