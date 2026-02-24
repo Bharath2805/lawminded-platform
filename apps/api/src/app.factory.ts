@@ -4,7 +4,13 @@ import cookieParser from 'cookie-parser';
 import { AppModule } from './app.module';
 
 function shouldAllowVercelPreviewOrigins(): boolean {
-  const raw = process.env.CORS_ALLOW_VERCEL_PREVIEWS ?? '';
+  const raw = process.env.CORS_ALLOW_VERCEL_PREVIEWS;
+
+  // Default ON for review/staging ergonomics on Vercel preview URLs.
+  if (typeof raw !== 'string') {
+    return true;
+  }
+
   return ['1', 'true', 'yes', 'on'].includes(raw.trim().toLowerCase());
 }
 
