@@ -6,6 +6,7 @@
   "private": true,
   "license": "UNLICENSED",
   "scripts": {
+    "postinstall": "npx prisma@6.19.2 generate --schema prisma/schema.prisma || true",
     "prebuild": "npx prisma@6.19.2 generate --schema prisma/schema.prisma",
     "build": "nest build",
     "format": "prettier --write \"src/**/*.ts\"",
