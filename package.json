@@ -19,7 +19,7 @@
     "db:migrate:deploy": "pnpm --filter @lawminded/api prisma:deploy",
     "format": "prettier --check .",
     "format:write": "prettier --write .",
-    "prepare": "husky"
+    "prepare": "husky || true"
   },
   "devDependencies": {
     "@commitlint/cli": "^19.8.0",
