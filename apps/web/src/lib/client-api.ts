@@ -4,8 +4,45 @@ export type AuthUser = {
   roles: string[];
 };
 
-export const apiUrl =
-  process.env.NEXT_PUBLIC_API_URL ?? "http://localhost:3001";
+function normalizeBaseUrl(value: string): string {
+  return value.endsWith("/") ? value.slice(0, -1) : value;
+}
+
+function resolveClientApiUrl(): string {
+  const configuredApiUrl = process.env.NEXT_PUBLIC_API_URL?.trim();
+  const configuredAppUrl = process.env.NEXT_PUBLIC_APP_URL?.trim();
+
+  if (configuredApiUrl && configuredApiUrl.length > 0) {
+    if (configuredApiUrl === "/backend") {
+      return configuredApiUrl;
+    }
+
+    if (configuredApiUrl.startsWith("/")) {
+      return normalizeBaseUrl(configuredApiUrl);
+    }
+
+    if (configuredAppUrl) {
+      try {
+        const apiHost = new URL(configuredApiUrl).host;
+        const appHost = new URL(configuredAppUrl).host;
+
+        if (apiHost === appHost) {
+          return "/backend";
+        }
+      } catch {
+        // ignore malformed URL and return configured value below.
+      }
+    }
+
+    return normalizeBaseUrl(configuredApiUrl);
+  }
+
+  return process.env.NODE_ENV === "production"
+    ? "/backend"
+    : "http://localhost:3001";
+}
+
+export const apiUrl = resolveClientApiUrl();
 
 export async function readErrorMessage(response: Response): Promise<string> {
   try {

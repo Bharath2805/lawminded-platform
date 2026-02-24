@@ -2,10 +2,28 @@ import { cookies } from "next/headers";
 import { redirect } from "next/navigation";
 import { normalizeNextPath, type AuthUser } from "./client-api";
 
-const serverApiUrl =
-  process.env.API_URL ??
-  process.env.NEXT_PUBLIC_API_URL ??
-  "http://localhost:3001";
+const serverApiUrl = (() => {
+  const configuredApiUrl = process.env.API_URL?.trim();
+  const proxyTarget = process.env.API_PROXY_TARGET?.trim();
+  const publicApiUrl = process.env.NEXT_PUBLIC_API_URL?.trim();
+
+  if (configuredApiUrl && configuredApiUrl.length > 0) {
+    return configuredApiUrl;
+  }
+
+  if (proxyTarget && proxyTarget.length > 0) {
+    return proxyTarget;
+  }
+
+  if (
+    publicApiUrl &&
+    (publicApiUrl.startsWith("http://") || publicApiUrl.startsWith("https://"))
+  ) {
+    return publicApiUrl;
+  }
+
+  return "http://localhost:3001";
+})();
 
 type MeResponse = {
   user?: AuthUser;
