@@ -3,6 +3,11 @@ import { NestFactory } from '@nestjs/core';
 import cookieParser from 'cookie-parser';
 import { AppModule } from './app.module';
 
+function shouldAllowVercelPreviewOrigins(): boolean {
+  const raw = process.env.CORS_ALLOW_VERCEL_PREVIEWS ?? '';
+  return ['1', 'true', 'yes', 'on'].includes(raw.trim().toLowerCase());
+}
+
 function resolveAllowedOrigins(): string[] {
   const configuredOrigins = (process.env.CORS_ORIGIN ?? '')
     .split(',')
@@ -28,6 +33,7 @@ function resolveAllowedOrigins(): string[] {
 export async function createConfiguredNestApp() {
   const app = await NestFactory.create(AppModule, { rawBody: true });
   const allowedOrigins = resolveAllowedOrigins();
+  const allowVercelPreviews = shouldAllowVercelPreviewOrigins();
 
   app.enableCors({
     origin: (
@@ -39,7 +45,16 @@ export async function createConfiguredNestApp() {
         return;
       }
 
-      callback(new Error(`CORS blocked for origin: ${origin}`), false);
+      if (
+        allowVercelPreviews &&
+        origin.startsWith('https://') &&
+        origin.endsWith('.vercel.app')
+      ) {
+        callback(null, true);
+        return;
+      }
+
+      callback(null, false);
     },
     credentials: true,
     methods: ['GET', 'POST', 'PUT', 'PATCH', 'DELETE', 'OPTIONS'],
