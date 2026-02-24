@@ -4,12 +4,13 @@ RUN apt-get update \
   && rm -rf /var/lib/apt/lists/* \
   && corepack enable
 WORKDIR /app
+ENV HUSKY=0
 
 FROM base AS deps
 COPY package.json pnpm-lock.yaml pnpm-workspace.yaml turbo.json ./
 COPY apps/api/package.json apps/api/package.json
 COPY apps/web/package.json apps/web/package.json
-RUN pnpm install --frozen-lockfile
+RUN pnpm install --frozen-lockfile --prod=false
 
 FROM base AS builder
 COPY . .
@@ -26,4 +27,4 @@ COPY --from=builder /app/package.json /app/pnpm-lock.yaml /app/pnpm-workspace.ya
 COPY --from=builder /app/node_modules ./node_modules
 COPY --from=builder /app/apps/api ./apps/api
 EXPOSE 3001
-CMD ["pnpm", "--filter", "@lawminded/api", "start:prod"]
+CMD ["sh", "-c", "pnpm --filter @lawminded/api prisma:deploy && pnpm --filter @lawminded/api start:prod"]
