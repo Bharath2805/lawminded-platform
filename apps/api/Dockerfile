@@ -1,5 +1,8 @@
-FROM node:20-alpine AS base
-RUN corepack enable
+FROM node:20-bookworm-slim AS base
+RUN apt-get update \
+  && apt-get install -y --no-install-recommends openssl ca-certificates \
+  && rm -rf /var/lib/apt/lists/* \
+  && corepack enable
 WORKDIR /app
 
 FROM base AS deps
@@ -12,6 +15,7 @@ FROM base AS builder
 COPY . .
 COPY --from=deps /app/node_modules ./node_modules
 ENV DATABASE_URL=postgresql://postgres:postgres@localhost:5432/lawminded
+ENV DIRECT_URL=postgresql://postgres:postgres@localhost:5432/lawminded
 RUN pnpm --filter @lawminded/api prisma:generate
 RUN pnpm --filter @lawminded/api build
 
